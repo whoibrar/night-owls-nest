@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Night Owls Hangout</title>
+    <style>
+        body, input, button {
+            font-family: 'VT323', 'Courier New', monospace;
+            background-color: #000000;
+            color: #00FF00;
+            font-size: 18px;
+            line-height: 1.4;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #00FF00;
+            text-shadow: 0 0 5px #00FF00;
+        }
+        #chat {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #00FF00;
+            padding: 10px;
+            background-color: #000000;
+            box-shadow: 0 0 10px #00FF00 inset;
+        }
+        #message-form {
+            display: flex;
+        }
+        #message-input {
+            flex-grow: 1;
+            background-color: #000000;
+            color: #00FF00;
+            border: 1px solid #00FF00;
+            padding: 5px;
+        }
+        button {
+            background-color: #00FF00;
+            color: #000000;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            text-shadow: 0 0 5px #000000;
+        }
+        button:hover {
+            background-color: #00CC00;
+        }
+        @font-face {
+            font-family: 'VT323';
+            src: url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2hsYHpT2dkNE.woff2') format('woff2');
+        }
+    </style>
+</head>
+<body>
+    <h1>Night Owls Hangout</h1>
+    <div id="chat"></div>
+    <form id="message-form">
+        <input type="text" id="message-input" placeholder="Type your message..." required>
+        <button type="submit">Send</button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const chat = document.getElementById('chat');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        let username;
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('set username', (name) => {
+            username = name;
+            addMessage('System', `Welcome, ${username}!`);
+        });
+
+        socket.on('chat message', (data) => {
+            addMessage(data.username, data.message);
+        });
+
+        socket.on('error', (message) => {
+            addMessage('System', message);
+        });
+
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('chat message', message);
+                messageInput.value = '';
+            }
+        });
+
+        function addMessage(user, message) {
+            const messageElement = document.createElement('p');
+            messageElement.textContent = `${user}: ${message}`;
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        // Add this line to check if the script is running
+        console.log('Script loaded');
+    </script>
+</body>
+</html>
