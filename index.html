@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Night Owls Hangout</title>
+    <title>Night Owls Nest</title>
     <style>
         body, input, button {
             font-family: 'VT323', 'Courier New', monospace;
@@ -20,9 +20,16 @@
             height: 100vh;
             box-sizing: border-box;
         }
-        h1 {
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
             color: #00FF00;
             text-shadow: 0 0 5px #00FF00;
+            margin: 0;
         }
         #chat {
             flex-grow: 1;
@@ -54,6 +61,28 @@
         button:hover {
             background-color: #00CC00;
         }
+        #chat, #message-form, #username-display, #chat-close-time {
+            display: none; /* Hide these elements by default */
+        }
+        #countdown {
+            display: none; /* Hide countdown by default */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            text-align: center;
+        }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            text-align: center;
+        }        #username-display, #chat-close-time {
+            margin-top: 10px;
+        }
         @font-face {
             font-family: 'VT323';
             src: url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2hsYHpT2dkNE.woff2') format('woff2');
@@ -61,19 +90,80 @@
     </style>
 </head>
 <body>
-    <h1>Night Owls Hangout</h1>
+    <div class="header">
+        <h1>Night Owls Hangout</h1>
+        <div id="current-time"></div>
+    </div>
+    <div id="username-display"></div>
+    <div id="chat-close-time"></div>
     <div id="chat"></div>
     <form id="message-form">
         <input type="text" id="message-input" placeholder="Type your message..." required>
         <button type="submit">Send</button>
     </form>
+    <div id="countdown"></div>
+    <div id="loading">Connecting to Night Owls Hangout...</div>
+
+
+    
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         const chat = document.getElementById('chat');
         const messageForm = document.getElementById('message-form');
         const messageInput = document.getElementById('message-input');
+        const countdownElement = document.getElementById('countdown');
+        const currentTimeElement = document.getElementById('current-time');
+        const chatCloseTimeElement = document.getElementById('chat-close-time');
+        const usernameDisplay = document.getElementById('username-display');
+        const loadingElement = document.getElementById('loading');
         let username;
+        let chatOpenHour, chatCloseHour;
+        let countdownInterval, chatCloseInterval;
+
+        function updateCurrentTime() {
+            const now = new Date();
+            currentTimeElement.textContent = now.toLocaleTimeString();
+        }
+
+        function updateCountdown() {
+            const now = new Date();
+            const target = new Date(now);
+            target.setHours(chatOpenHour, 0, 0, 0);
+            if (now > target) {
+                target.setDate(target.getDate() + 1);
+            }
+            const diff = target - now;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            countdownElement.textContent = `Chat opens in:\n${hours}h ${minutes}m ${seconds}s`;
+        }
+
+        function updateChatCloseTime() {
+            const now = new Date();
+            const target = new Date(now);
+            target.setHours(chatCloseHour, 0, 0, 0);
+            if (now > target) {
+                target.setDate(target.getDate() + 1);
+            }
+            const diff = target - now;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            chatCloseTimeElement.textContent = `Chat closes in: ${hours}h ${minutes}m ${seconds}s`;
+        }
+
+        function startCountdown() {
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+        }
+
+        function startChatCloseTimer() {
+            updateChatCloseTime();
+            chatCloseInterval = setInterval(updateChatCloseTime, 1000);
+        }
 
         socket.on('connect', () => {
             console.log('Connected to server');
@@ -81,7 +171,7 @@
 
         socket.on('set username', (name) => {
             username = name;
-            addMessage('System', `Welcome, ${username}!`);
+            usernameDisplay.textContent = `You are ${username}`;
         });
 
         socket.on('chat message', (data) => {
@@ -90,6 +180,36 @@
 
         socket.on('error', (message) => {
             addMessage('System', message);
+        });
+
+        socket.on('chat config', (config) => {
+            chatOpenHour = config.openHour;
+            chatCloseHour = config.closeHour;
+            // Now that we have the configuration, we can initialize the UI
+            initializeUI();
+        });
+
+        function initializeUI() {
+            socket.emit('get chat status');
+        }
+
+        socket.on('chat status', (isOpen) => {
+            loadingElement.style.display = 'none';
+            if (isOpen) {
+                countdownElement.style.display = 'none';
+                chat.style.display = 'block';
+                messageForm.style.display = 'flex';
+                usernameDisplay.style.display = 'block';
+                chatCloseTimeElement.style.display = 'block';
+                startChatCloseTimer();
+            } else {
+                countdownElement.style.display = 'block';
+                chat.style.display = 'none';
+                messageForm.style.display = 'none';
+                usernameDisplay.style.display = 'none';
+                chatCloseTimeElement.style.display = 'none';
+                startCountdown();
+            }
         });
 
         messageForm.addEventListener('submit', (e) => {
@@ -108,8 +228,9 @@
             chat.scrollTop = chat.scrollHeight;
         }
 
-        // Add this line to check if the script is running
-        console.log('Script loaded');
+        updateCurrentTime();
+        setInterval(updateCurrentTime, 1000);
     </script>
+
 </body>
 </html>
